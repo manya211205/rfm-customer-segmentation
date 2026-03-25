@@ -1,55 +1,52 @@
-# 🛒 Customer RFM Segmentation — UK Online Retail
-
-![Excel](https://img.shields.io/badge/Tool-Excel-217346?style=flat&logo=microsoftexcel&logoColor=white)
-![SQL](https://img.shields.io/badge/Tool-SQL-4479A1?style=flat&logo=mysql&logoColor=white)
-![Power BI](https://img.shields.io/badge/Tool-Power%20BI-F2C811?style=flat&logo=powerbi&logoColor=black)
+# Customer Segmentation using RFM Analysis — UK Online Retail
 
 ---
 
-## 📌 Project Overview
+## Why I did this project
 
-This project segments **4,338 customers** from a UK-based online retail store into behavioral groups using **RFM (Recency, Frequency, Monetary) Analysis** — a proven customer analytics framework widely used in D2C and e-commerce companies.
+I kept seeing RFM analysis mentioned in data analytics job descriptions and YouTube videos about e-commerce analytics, so I wanted to actually try it myself rather than just know what the acronym stands for.
 
-The goal is to help the business understand **who their best customers are**, **who is at risk of churning**, and **where to focus retention vs. acquisition efforts**.
-
----
-
-## 📊 Dataset
-
-| Property | Details |
-|---|---|
-| Source | [UCI Machine Learning Repository — Online Retail II](https://archive.ics.uci.edu/dataset/502/online+retail+ii) |
-| Transactions | 541,909 rows |
-| Time Period | December 2010 – December 2011 |
-| Geography | Primarily United Kingdom |
-| Columns | InvoiceNo, StockCode, Description, Quantity, InvoiceDate, UnitPrice, CustomerID, Country |
+I found the UK Online Retail dataset on Kaggle — it's a real transactional dataset from a UK gift shop with over 500K rows. Felt like a good enough dataset to work with since it's messy in the right ways (missing customer IDs, cancelled orders, weird negative quantities) and actually requires some cleaning before you can do anything useful with it.
 
 ---
 
-## 🛠️ Tools Used
+## What the project does
 
-- **SQL (SQLite)** — RFM metric calculation, scoring, and segmentation logic
-- **Excel** — Dashboard, charts, and segment visualization
-- **Power BI / Tableau** — (optional extension for interactive reporting)
+The idea is pretty simple — instead of treating all customers the same, RFM analysis scores every customer on three things:
+
+- **Recency** — how recently did they buy?
+- **Frequency** — how often do they buy?
+- **Monetary** — how much have they spent in total?
+
+Each customer gets a score from 1 to 5 on each metric, and based on those scores they get placed into a segment like "Champion", "At Risk", or "Lost". The business can then target each group differently instead of sending the same generic email to everyone.
 
 ---
 
-## 🔢 Methodology
+## Tools I used
 
-### Step 1 — Data Cleaning
-- Removed rows with missing `CustomerID` (~135K rows)
-- Removed cancelled orders (InvoiceNo starting with 'C')
-- Removed zero or negative `Quantity` and `UnitPrice` values
-- Final clean dataset: **397,884 rows | 4,338 customers**
+- SQL for all the analysis and scoring logic
+- Excel for the dashboard and charts
 
-### Step 2 — RFM Metric Calculation (SQL)
-Calculated three core metrics per customer using SQL aggregation:
+---
 
-| Metric | Definition |
-|---|---|
-| **Recency** | Days since last purchase (vs. snapshot date: 2011-12-10) |
-| **Frequency** | Total number of distinct orders placed |
-| **Monetary** | Total revenue generated (Quantity × UnitPrice) |
+## Dataset
+
+UK Online Retail II dataset from Kaggle — 541,909 transactions between Dec 2010 and Dec 2011.
+
+---
+
+## What I actually did
+
+### Cleaning the data first
+
+The raw data had some issues I had to deal with before touching any analysis:
+- Around 135,000 rows had no CustomerID — dropped those since you can't do customer-level analysis without an ID
+- Cancelled orders had InvoiceNo starting with "C" and negative quantities — removed those too
+- A few rows had UnitPrice as 0 which didn't make sense, filtered those out
+
+After cleaning I was left with about 397,884 rows and 4,338 unique customers.
+
+### Calculating RFM metrics in SQL
 
 ```sql
 SELECT
@@ -63,11 +60,9 @@ WHERE CustomerID IS NOT NULL
 GROUP BY CustomerID
 ```
 
-### Step 3 — RFM Scoring (NTILE)
-Each customer was scored 1–5 on each metric using SQL `NTILE(5)` window functions:
-- **R Score 5** = most recent buyers
-- **F Score 5** = most frequent buyers
-- **M Score 5** = highest spenders
+### Scoring customers 1–5 using NTILE
+
+This was actually the part that confused me the most. For Recency, a lower number of days is better (means they bought recently), so the ORDER BY has to be DESC — I got this backwards the first time and all my Champions were actually the oldest customers which made no sense.
 
 ```sql
 SELECT *,
@@ -77,8 +72,7 @@ SELECT *,
 FROM rfm_raw
 ```
 
-### Step 4 — Segment Assignment (CASE WHEN)
-8 segments assigned using business logic in SQL:
+### Assigning segments with CASE WHEN
 
 ```sql
 CASE
@@ -95,63 +89,34 @@ END AS segment
 
 ---
 
-## 📈 Key Findings
+## Results
 
 | Segment | Customers | Revenue (£) | Revenue Share |
 |---|---|---|---|
-| 🏆 Champions | 1,010 | £58,65,418 | **65.8%** |
-| 💚 Loyal Customers | 945 | £14,72,718 | 16.5% |
-| ⚠️ At Risk | 536 | £6,23,412 | 7.0% |
-| 🔴 Lost | 915 | £3,21,009 | 3.6% |
+| Champions | 1,010 | £58,65,418 | 65.8% |
+| Loyal Customers | 945 | £14,72,718 | 16.5% |
+| At Risk | 536 | £6,23,412 | 7.0% |
+| Lost | 915 | £3,21,009 | 3.6% |
 | Others | 938 | £6,09,827 | 7.1% |
 
-### 💡 Business Insights
+The thing that stood out to me most was how concentrated the revenue was. I expected it to be more evenly spread but Champions — which is only about 1 in 4 customers — were responsible for nearly 66% of all revenue. Classic Pareto but still surprising to see it play out so clearly in real data.
 
-1. **Champions drive the business** — Just 23% of customers (Champions) generate 66% of total revenue. Retaining these customers is the #1 priority.
-
-2. **At-Risk segment is a big opportunity** — 536 high-value customers haven't purchased recently. A targeted re-engagement campaign (discount, loyalty reward) could recover significant revenue.
-
-3. **915 Lost customers** — These customers haven't purchased in a long time. A win-back email campaign with a strong offer could reactivate even 10–15% of them.
-
-4. **Recent Customers need nurturing** — 307 customers made their first or recent purchase but haven't become loyal yet. Onboarding flows and follow-up offers can convert them to Loyal Customers.
+The other thing I found interesting was the "At Risk" segment — 536 customers who used to buy frequently and spend a lot, but haven't come back recently. These are probably the most valuable people to target with a re-engagement campaign because they already know the brand.
 
 ---
 
-## 📁 Files in This Repository
+## What's in the Excel file
 
-| File | Description |
-|---|---|
-| `RFM_Customer_Segmentation.xlsx` | Full Excel workbook with dashboard, RFM data, top customers, and SQL documentation |
-| `README.md` | Project documentation (this file) |
-
----
-
-## 🗂️ Excel Workbook Structure
-
-The Excel file contains **4 sheets**:
-
-| Sheet | Contents |
-|---|---|
-| 📊 RFM Dashboard | KPI cards, segment summary table, revenue bar chart, customer pie chart |
-| 📋 RFM Data | All 4,338 customers with RFM scores and segment labels |
-| 🏆 Top 20 Customers | Highest-value customers with gold/silver/bronze highlights |
-| 📝 SQL Queries | Full SQL code used — documented step by step |
+The workbook has 4 sheets:
+- Dashboard with KPI cards and charts
+- Full table of all 4,338 customers with their RFM scores and segment
+- Top 20 customers by revenue
+- All the SQL queries documented step by step
 
 ---
 
-## 🚀 How to Reproduce
-
-1. Download the dataset from [Kaggle — UK Online Retail](https://www.kaggle.com/datasets/mashlyn/online-retail-ii-uci)
-2. Load into SQLite / any SQL environment
-3. Run the SQL queries in the **📝 SQL Queries** sheet in order (Steps 1–4)
-4. Export results to Excel and replicate the dashboard
-
----
-
-## 👤 Author
+## Author
 
 Manya Pahwa
-- 📧 manaypahwa21@gmail.com
----
-
+manyapahwa21@gmail.com
 
